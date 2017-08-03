@@ -21,11 +21,12 @@ import torchvision.datasets.folder
 import torchvision.transforms as transforms
 
 from dataset import Dataset
+from transform_cv2 import CenterCropCv, ScaleCv
 
 parser = argparse.ArgumentParser(description='Defence')
-parser.add_argument('--input_dir', metavar='DIR',
+parser.add_argument('--input_dir', metavar='DIR', default='',
                     help='Input directory with images.')
-parser.add_argument('--output_file', metavar='FILE',
+parser.add_argument('--output_file', metavar='FILE', default='',
                     help='Output file to save labels.')
 parser.add_argument('--checkpoint_path', default=None,
                     help='Path to network checkpoint.')
@@ -40,7 +41,6 @@ parser.add_argument('--no-gpu', action='store_true', default=False,
 class LeNormalize(object):
     """Normalize to -1..1 in Google Inception style
     """
-
     def __call__(self, tensor):
         for t in tensor:
             t.sub_(0.5).mul_(2.0)
@@ -50,9 +50,16 @@ class LeNormalize(object):
 def main():
     args = parser.parse_args()
 
+    if not os.path.exists(args.input_dir):
+        print("Error: Invalid input folder %s" % args.input_dir)
+        exit(-1)
+    if not args.output_file:
+        print("Error: Please specify an output file")
+        exit(-1)
+
     tf = transforms.Compose([
-        transforms.Scale(int(math.floor(args.img_size/0.875))),
-        transforms.CenterCrop(args.img_size),
+        ScaleCv(int(math.floor(args.img_size/0.875))),
+        CenterCropCv(args.img_size),
         transforms.ToTensor(),
         LeNormalize(),
         #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -77,14 +84,18 @@ def main():
         exit(-1)
 
     outputs = []
-    for batch_idx, input in enumerate(loader):
+    for batch_idx, (input, _) in enumerate(loader):
         if not args.no_gpu:
             input = input.cuda()
         input_var = autograd.Variable(input, volatile=True)
+        torchvision.utils.save_image(
+            input,
+            os.path.join('/output_data', 'input-batch-%d.jpg' % batch_idx),
+            normalize=True)
         labels = model(input_var)
         labels = labels.max(1)[1] + 1  # argmax + offset to match Google's Tensorflow + Inception 1001 class ids
         outputs.append(labels.data.cpu().numpy())
-    outputs = np.concatenate(outputs, axis=0)
+    outputs = np.concatenate(outputs, axis=0).squeeze()
 
     with open(args.output_file, 'w') as out_file:
         filenames = dataset.filenames()

@@ -1,6 +1,6 @@
 {
   "type": "defense",
-  "container": "rwightman/pytorch-extra",
-  "container_gpu": "rwightman/pytorch-extra",
+  "container": "rwightman/pytorch-opencv:v0.1.12",
+  "container_gpu": "rwightman/pytorch-opencv:v0.1.12",
   "entry_point": "run_defense.sh"
 }

@@ -3,38 +3,54 @@ import torch.utils.data as data
 from PIL import Image
 import os
 import os.path
+import cv2
+import re
 import torch
+
 
 IMG_EXTENSIONS = ['.png', '.jpg']
 
 
-def is_image_file(filename):
-    return any(filename.tolower().endswith(extension) for extension in IMG_EXTENSIONS)
+def natural_key(string_):
+    """See http://www.codinghorror.com/blog/archives/001018.html"""
+    return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', string_.lower())]
 
 
-def find_classes(dir):
-    classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
-    classes.sort()
-    class_to_idx = {classes[i]: i for i in range(len(classes))}
-    return classes, class_to_idx
-
-
-def find_inputs(folder, types=IMG_EXTENSIONS):
-    inputs = []
-    for root, _, files in os.walk(folder, topdown=False):
-        for rel_filename in files:
-            base, ext = os.path.splitext(rel_filename)
+def find_images_and_targets(folder, types=IMG_EXTENSIONS, class_to_idx=None, leaf_name_only=True, sort=True):
+    if class_to_idx is None:
+        class_to_idx = dict()
+        build_class_idx = True
+    else:
+        build_class_idx = False
+    labels = []
+    filenames = []
+    for root, subdirs, files in os.walk(folder, topdown=False):
+        rel_path = os.path.relpath(root, folder) if (root != folder) else ''
+        label = os.path.basename(rel_path) if leaf_name_only else rel_path.replace(os.path.sep, '_')
+        if build_class_idx and not subdirs:
+            class_to_idx[label] = 0
+        for f in files:
+            base, ext = os.path.splitext(f)
             if ext.lower() in types:
-                abs_filename = os.path.join(root, rel_filename)
-                inputs.append((abs_filename, None))  #FIXME support folder structures with classes as well
-    return inputs
+                filenames.append(os.path.join(root,f))
+                labels.append(label)
+    if build_class_idx:
+        classes = sorted(class_to_idx.keys(), key=natural_key)
+        for idx, c in enumerate(classes):
+            class_to_idx[c] = idx
+    images_and_targets = zip(filenames, [class_to_idx[l] for l in labels])
+    if sort:
+        images_and_targets = sorted(images_and_targets, key=lambda k: natural_key(k[0]))
+    if build_class_idx:
+        return images_and_targets, classes, class_to_idx
+    else:
+        return images_and_targets
 
 
 class Dataset(data.Dataset):
 
     def __init__(self, root, transform=None):
-        classes, class_to_idx = find_classes(root)
-        imgs = find_inputs(root)
+        imgs, classes, class_to_idx = find_images_and_targets(root)
         if len(imgs) == 0:
             raise(RuntimeError("Found 0 images in subfolders of: " + root + "\n"
                                "Supported image extensions are: " + ",".join(IMG_EXTENSIONS)))
@@ -47,13 +63,15 @@ class Dataset(data.Dataset):
 
     def __getitem__(self, index):
         path, target = self.imgs[index]
-        img = Image.open(path).convert('RGB')
+        img = cv2.imread(path)
+        img = cv2.bilateralFilter(img, 5, 75, 75)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
         if self.transform is not None:
             img = self.transform(img)
         if target is None:
-            return img
-        else:
-            return img, target
+            target = torch.zeros(1).long()
+        return img, target
 
     def __len__(self):
         return len(self.imgs)
