@@ -23,9 +23,9 @@ import torchvision.transforms as transforms
 from dataset import Dataset
 
 parser = argparse.ArgumentParser(description='Defence')
-parser.add_argument('--input_dir', metavar='DIR',
+parser.add_argument('--input_dir', metavar='DIR', default='',
                     help='Input directory with images.')
-parser.add_argument('--output_file', metavar='FILE',
+parser.add_argument('--output_file', metavar='FILE', default='',
                     help='Output file to save labels.')
 parser.add_argument('--checkpoint_path', default=None,
                     help='Path to network checkpoint.')
@@ -49,6 +49,13 @@ class LeNormalize(object):
 
 def main():
     args = parser.parse_args()
+
+    if not os.path.exists(args.input_dir):
+        print("Error: Invalid input folder %s" % args.input_dir)
+        exit(-1)
+    if not args.output_file:
+        print("Error: Please specify an output file")
+        exit(-1)
 
     tf = transforms.Compose([
         transforms.Scale(int(math.floor(args.img_size/0.875))),
@@ -77,7 +84,7 @@ def main():
         exit(-1)
 
     outputs = []
-    for batch_idx, input in enumerate(loader):
+    for batch_idx, (input, _) in enumerate(loader):
         if not args.no_gpu:
             input = input.cuda()
         input_var = autograd.Variable(input, volatile=True)
