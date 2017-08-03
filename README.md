@@ -1,6 +1,6 @@
 # pytorch-nips2017-defense-example
 
-This is a baseline, null defense that works within the Cleverhans (https://github.com/tensorflow/cleverhans) framework for the NIPS-2017 adversarial competition. It is intended to be equivalent to the 'base_inception_model' in the sample_defenses but using PyTorch instead of Tensorflow. 
+This is a baseline defense (with a simple OpenCV filter) that works within the Cleverhans (https://github.com/tensorflow/cleverhans) framework for the NIPS-2017 adversarial competition. It is intended to be equivalent to the 'base_inception_model' in the sample_defenses but using PyTorch instead of Tensorflow. 
 
 To run:
 1. Setup and verify cleverhans nips17 adversarial competition example environment
